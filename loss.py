@@ -10,15 +10,37 @@ np.random.seed(123)
 import warnings
 import numpy as np
 from keras import backend as K
-from keras.optimizers import Adam, Nadam
+from tensorflow.keras.optimizers import Adam, Nadam
 import tensorflow as tf
+from keras.optimizers import Adagrad
+
+from keras.optimizers import RMSprop
+from keras.optimizers import SGD
+
+
+
+
 def el(y_true, y_pred):
     l = keras.losses.BinaryCrossentropy(y_true,y_pred)
     return l
+
+
 def get_optimizer():
     
-    adam = Adam(lr=1e-4, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+    adam = Adam(lr=1e-3, beta_1=0.94, beta_2=0.999, epsilon=1e-07)
     return adam
+
+# def get_optimizer():
+#     adagrad = Adagrad(lr=1e-2, epsilon=1e-04)
+#     return adagrad
+
+# def get_optimizer():
+#     rmsprop = RMSprop(lr=1e-2, rho=0.9, epsilon=1e-04)
+#     return rmsprop
+
+# def get_optimizer():
+#     sgd = SGD(lr=0.05, momentum=0.9)
+#     return sgd
 
 def single_dice_coef(y_true, y_pred_bin):
     # shape of y_true and y_pred_bin: (height, width)

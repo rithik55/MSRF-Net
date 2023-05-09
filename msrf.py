@@ -23,7 +23,8 @@ from keras.layers import Dense, Dropout,Input,Average,Conv2DTranspose,SeparableC
 from keras import backend as K
 from keras.layers import concatenate ,Lambda
 import itertools
-from keras.layers.normalization import BatchNormalization
+from tensorflow.keras.layers import BatchNormalization
+#from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint 
 import tensorflow as tf
@@ -804,7 +805,7 @@ def compute_iou(y_pred, y_true):
     y_pred = y_pred.flatten()
     y_true = y_true.flatten()
     intersection = (y_true * y_pred).sum()
-    #intersection = np.sum(intersection)     
+    #intersection = np.sum(intersection)    
     union = y_true.sum() + y_pred.sum() - intersection
     current = confusion_matrix(y_true, y_pred, labels=[0, 1])
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred, labels=[0, 1]).ravel()

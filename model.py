@@ -14,18 +14,20 @@ from keras.layers import Dense, Dropout,Input,Average,Conv2DTranspose,SeparableC
 from keras.initializers import RandomNormal
 
 from keras import backend as K
-from keras.layers.normalization import BatchNormalization
+from tensorflow.keras.layers import BatchNormalization
+#from keras.layers.normalization import BatchNormalization
 import tensorflow as tf
-from keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 import numpy as np
-from keras.layers.advanced_activations import LeakyReLU
+from keras.layers import LeakyReLU
+#from keras.layers.advanced_activations import LeakyReLU
 from keras.models import Model
 from tqdm import tqdm_notebook as tqdm
 import cv2
 from sklearn.utils import shuffle
 import tifffile as tif
 from sklearn.model_selection import train_test_split
-from keras.optimizers import Adam, Nadam
+from tensorflow.keras.optimizers import Adam, Nadam
 from glob import glob
 from sklearn.utils import shuffle
 import skimage.io
@@ -147,6 +149,20 @@ def DSup1(x, var):
     return d
 
 #Keras
+from tensorflow.keras.layers import Layer
+class CannyLayer(Layer):
+    def __init__(self, min_val=10, max_val=100, **kwargs):
+        super(CannyLayer, self).__init__(**kwargs)
+        self.min_val = min_val
+        self.max_val = max_val
+    
+    def call(self, inputs):
+        canny_output = tf.image.convert_image_dtype(inputs, tf.float32)
+        canny_output = tf.image.rgb_to_grayscale(canny_output)
+        canny_output = tf.image.sobel_edges(canny_output)
+        canny_output = tf.sqrt(tf.reduce_sum(tf.square(canny_output), axis=-1))
+        canny_output = tf.cast(255.0 * canny_output / tf.reduce_max(canny_output), tf.uint8)
+        return canny_output
 
 
 def msrf(input_size=(256,256,3),input_size_2=(256,256,1)):
@@ -264,8 +280,13 @@ def msrf(input_size=(256,256,3),input_size_2=(256,256,1)):
     ss = Conv2D(1,kernel_size=(1,1),padding='same')(ss)
     edge_out = Activation('sigmoid',name='edge_out')(ss)
     #######canny edge
-    canny = cv2.Canny(np.asarray(inputs),10,100)
-    cat = Concatenate()([edge_out,canny])
+    # Instantiate the CannyLayer
+    canny_layer = CannyLayer(min_val=10, max_val=100)
+    # Apply the layer to the Keras symbolic input/output tensor
+    canny = canny_layer(inputs_img)
+    canny_float32 = tf.cast(canny, dtype=tf.float32)
+    #canny = cv2.Canny(np.asarray(inputs_img),10,100)
+    cat = Concatenate()([edge_out,canny_float32])
     cw = Conv2D(1,kernel_size=(1,1),padding='same')(cat)
     acts = Activation('sigmoid')(cw)
     edge = Conv2D(1, kernel_size=(1,1),strides=(1,1),padding='same')(acts)
@@ -321,70 +342,70 @@ def msrf(input_size=(256,256,3),input_size_2=(256,256,1)):
     model = Model(inputs= [inputs_img,canny],outputs = [x,edge_out,pred2,pred4])
     return model
 
-def RDDB(x,y,nf1=128,nf2=1212,gc=64,bias=True):
-    x1 = Conv2D(filters=gc, kernel_size=3, strides=1,padding='same', bias=bias)(x)
+def RDDB(x,y,nf1=128,nf2=1212,gc=64,use_bias=True):
+    x1 = Conv2D(filters=gc, kernel_size=3, strides=1,padding='same', use_bias=use_bias)(x)
     x1 = LeakyReLU(alpha=0.25)(x1)
     
-    y1 = Conv2D(filters=gc, kernel_size=3, strides=1,padding='same', bias=bias)(y)
+    y1 = Conv2D(filters=gc, kernel_size=3, strides=1,padding='same', use_bias=use_bias)(y)
     y1 = LeakyReLU(alpha=0.25)(y)
     
-    x1c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(x)
+    x1c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(x)
     x1c = LeakyReLU(alpha=0.25)(x1c)
-    y1t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(y)
+    y1t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(y)
     y1t = LeakyReLU(alpha=0.25)(y1t)
     
     
     x2_input = concatenate([x,x1,y1t],axis=-1)
-    x2 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same',bias=bias)(x2_input)
+    x2 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same',use_bias=use_bias)(x2_input)
     x2 = LeakyReLU(alpha=0.25)(x2)
     
     y2_input = concatenate([y,y1,x1c],axis=-1)
-    y2 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same',bias=bias)(y2_input)
+    y2 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same',use_bias=use_bias)(y2_input)
     y2 = LeakyReLU(alpha=0.25)(y2)
     
-    x2c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(x1)
+    x2c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(x1)
     x2c = LeakyReLU(alpha=0.25)(x2c)
-    y2t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(y1)
+    y2t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(y1)
     y2t = LeakyReLU(alpha=0.25)(y2t)
     
     
     
     x3_input = concatenate([x,x1,x2,y2t] , axis=-1)
-    x3 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', bias=bias)(x3_input)
+    x3 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', use_bias=use_bias)(x3_input)
     x3 = LeakyReLU(alpha=0.25)(x3)
     
     y3_input = concatenate([y,y1,y2,x2c] , axis=-1)
-    y3 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', bias=bias)(y3_input)
+    y3 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', use_bias=use_bias)(y3_input)
     y3 = LeakyReLU(alpha=0.25)(y3)
     
-    x3c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(x3)
+    x3c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(x3)
     x3c = LeakyReLU(alpha=0.25)(x3c)
-    y3t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(y3)
+    y3t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(y3)
     y3t = LeakyReLU(alpha=0.25)(y3t)
     
     
         
     x4_input = concatenate([x,x1,x2,x3,y3t] , axis=-1)
-    x4 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', bias=bias)(x4_input)
+    x4 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', use_bias=use_bias)(x4_input)
     x4 = LeakyReLU(alpha=0.25)(x4)
     
     
     y4_input = concatenate([y,y1,y2,y3,x3c] , axis=-1)
-    y4 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', bias=bias)(y4_input)
+    y4 = Conv2D(filters= gc, kernel_size=3,strides=1, padding='same', use_bias=use_bias)(y4_input)
     y4 = LeakyReLU(alpha=0.25)(y4)
     
-    x4c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(x4)
+    x4c = Conv2D(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(x4)
     x4c = LeakyReLU(alpha=0.25)(x4c)
-    y4t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', bias=bias)(y4)
+    y4t = Conv2DTranspose(filters=gc, kernel_size=3, strides=2,padding='same', use_bias=use_bias)(y4)
     y4t = LeakyReLU(alpha=0.25)(y4t)
     
         
     x5_input = concatenate([x,x1,x2,x3,x4,y4t] , axis=-1)
-    x5 = Conv2D(filters= nf1, kernel_size=3,strides=1, padding='same', bias=bias)(x5_input)
+    x5 = Conv2D(filters= nf1, kernel_size=3,strides=1, padding='same', use_bias=use_bias)(x5_input)
     x5 = LeakyReLU(alpha=0.25)(x5)
     
     y5_input = concatenate([y,y1,y2,y3,y4,x4c] , axis=-1)
-    y5 = Conv2D(filters= nf2, kernel_size=3,strides=1, padding='same', bias=bias)(y5_input)
+    y5 = Conv2D(filters= nf2, kernel_size=3,strides=1, padding='same', use_bias=use_bias)(y5_input)
     y5 = LeakyReLU(alpha=0.25)(y5)
         
     x5 = Lambda(lambda x: x * 0.4)(x5)
